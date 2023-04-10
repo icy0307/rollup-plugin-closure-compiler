@@ -16,20 +16,10 @@
 
 import { CompileOptions } from 'google-closure-compiler';
 import { promises as fsPromises } from 'fs';
-import {
-  OutputOptions,
-  Plugin,
-  InputOptions,
-  PluginContext,
-  RenderedChunk,
-  TransformResult,
-} from 'rollup';
+import { OutputOptions, Plugin, InputOptions, PluginContext, RenderedChunk, TransformResult } from 'rollup';
 import compiler from './compiler';
 import options from './options';
-import {
-  transform as sourceTransform,
-  create as createSourceTransforms,
-} from './transformers/source/transforms';
+import { transform as sourceTransform, create as createSourceTransforms } from './transformers/source/transforms';
 import { preCompilation, create as createChunkTransforms } from './transformers/chunk/transforms';
 import { Mangle } from './transformers/mangle';
 import { Ebbinghaus } from './transformers/ebbinghaus';
@@ -44,25 +34,16 @@ export default function closureCompiler(requestedCompileOptions: CompileOptions 
 
   return {
     name: 'closure-compiler',
-    options: options => (inputOptions = options),
+    options: (options) => (inputOptions = options),
     buildStart() {
       context = this;
-      sourceTransforms = createSourceTransforms(
-        context,
-        requestedCompileOptions,
-        mangler,
-        memory,
-        inputOptions,
-        {},
-      );
+      sourceTransforms = createSourceTransforms(context, requestedCompileOptions, mangler, memory, inputOptions, {});
       if (
         'compilation_level' in requestedCompileOptions &&
         requestedCompileOptions.compilation_level === 'ADVANCED_OPTIMIZATIONS' &&
         Array.isArray(inputOptions.input)
       ) {
-        context.warn(
-          'Code Splitting with Closure Compiler ADVANCED_OPTIMIZATIONS is not currently supported.',
-        );
+        context.warn('Code Splitting with Closure Compiler ADVANCED_OPTIMIZATIONS is not currently supported.');
       }
     },
     transform: async (code: string, id: string): Promise<TransformResult> => {
@@ -82,6 +63,7 @@ export default function closureCompiler(requestedCompileOptions: CompileOptions 
         memory,
         inputOptions,
         outputOptions,
+        'pre',
       );
       const preCompileOutput = (await preCompilation(code, chunk, renderChunkTransforms)).code;
       const [compileOptions, mapFile] = await options(
@@ -91,9 +73,18 @@ export default function closureCompiler(requestedCompileOptions: CompileOptions 
         renderChunkTransforms,
       );
 
+      const postRenderChunkTransforms = createChunkTransforms(
+        context,
+        requestedCompileOptions,
+        mangler,
+        memory,
+        inputOptions,
+        outputOptions,
+        'post',
+      );
       try {
         return {
-          code: await compiler(compileOptions, chunk, renderChunkTransforms),
+          code: await compiler(compileOptions, chunk, postRenderChunkTransforms),
           map: JSON.parse(await fsPromises.readFile(mapFile, 'utf8')),
         };
       } catch (error) {

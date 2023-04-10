@@ -46,6 +46,22 @@ const TRANSFORMS: Array<typeof ChunkTransform> = [
   HashbangApplyTransform,
 ];
 
+const POST_TRANSFORMS: Array<typeof ChunkTransform> = [
+  HashbangRemoveTransform,
+  // Acorn can parse content starting here
+  ConstTransform,
+  IifeTransform,
+  CJSTransform,
+  LiteralComputedKeys,
+  StrictTransform,
+  // ImportTransform should be in front of ExportTransform in post compile phrase
+  ImportTransform,
+  ExportTransform,
+  ASITransform,
+  // Acorn cannot parse content starting here.
+  HashbangApplyTransform,
+];
+
 /**
  * Instantiate transform class instances for the plugin invocation.
  * @param context Plugin context to bind for each transform instance.
@@ -63,10 +79,12 @@ export function create(
   memory: Ebbinghaus,
   inputOptions: InputOptions,
   outputOptions: OutputOptions,
+  method: 'pre' | 'post',
 ): Array<ChunkTransform> {
   const pluginOptions = pluckPluginOptions(requestedCompileOptions);
-  return TRANSFORMS.map(
-    transform => new transform(context, pluginOptions, mangler, memory, inputOptions, outputOptions),
+  const transformsList = method === 'pre' ? TRANSFORMS : POST_TRANSFORMS;
+  return transformsList.map(
+    (transform) => new transform(context, pluginOptions, mangler, memory, inputOptions, outputOptions),
   );
 }
 
